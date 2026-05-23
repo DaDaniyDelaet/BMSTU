@@ -1,0 +1,80 @@
+digraph NPDA_Task3_Simplified {
+  rankdir=LR;
+  fontsize=12;
+  labelloc="t";
+
+
+  node [shape=circle, fontsize=12];
+  start [shape=point];
+  qAcc [shape=doublecircle, label="qACC"];
+
+  qInit [label="qInit"];
+  qS    [label="qS\n(choose S-prod)"];
+  qRET  [label="qRET\n(return)"];
+
+  qBase0 [label="qBase0"];
+  qBase1 [label="qBase1"];
+  qBase2 [label="qBase2"];
+
+  qASA0 [label="qASA0\n(push M)"];
+  qASA1 [label="qASA1\n(A1 count)"];
+  qASA2 [label="qASA2\n(call S)"];
+  qASA3 [label="qASA3\n(A2 match)"];
+  qASA4 [label="qASA4\n(pop M)"];
+
+  qSAAS0 [label="qSAAS0\n(call S1)"];
+  qSAAS1 [label="qSAAS1\n(push M)"];
+  qSAAS2 [label="qSAAS2\n(A1 count)"];
+  qSAAS3 [label="qSAAS3\n(A2 match)"];
+  qSAAS4 [label="qSAAS4\n(pop M)"];
+  qSAAS5 [label="qSAAS5\n(call S2)"];
+
+  qAcount [label="qAcount\n(scan A, push X on b)"];
+  qAmatch [label="qAmatch\n(scan A, pop X on b)"];
+
+  start -> qInit;
+
+
+  qInit -> qS [label="ε, ⊥→rEND⊥"];
+
+
+  qS -> qBase0 [label="ε, Z→Z\n(S→aba)"];
+  qS -> qASA0  [label="ε, Z→Z\n(S→ASA)"];
+  qS -> qSAAS0 [label="ε, Z→Z\n(S→SAAS)"];
+
+
+  qBase0 -> qBase1 [label="a, Z→Z"];
+  qBase1 -> qBase2 [label="b, Z→Z"];
+  qBase2 -> qRET   [label="a, Z→Z"];
+
+  qASA0 -> qASA1    [label="ε, Z→MZ"];
+  qASA1 -> qAcount  [label="ε, Z→Z"];
+  qASA2 -> qS       [label="ε, Z→rASA Z"];   
+  qASA3 -> qAmatch  [label="ε, Z→Z"];
+  qASA4 -> qRET     [label="ε, M→ε"];
+
+  qSAAS0 -> qS      [label="ε, Z→rS1 Z"];    
+  qSAAS1 -> qSAAS2  [label="ε, Z→MZ"];
+  qSAAS2 -> qAcount [label="ε, Z→Z"];
+  qSAAS3 -> qAmatch [label="ε, Z→Z"];
+  qSAAS4 -> qSAAS5  [label="ε, M→ε"];
+  qSAAS5 -> qS      [label="ε, Z→rS2 Z"];    
+  
+  qRET -> qAcc   [label="ε, rEND→ε"];
+  qRET -> qASA3  [label="ε, rASA→ε"];
+  qRET -> qSAAS1 [label="ε, rS1→ε"];
+  qRET -> qRET   [label="ε, rS2→ε"];
+
+
+  qAcount -> qAcount [label="b, M→XM\n(если X нет)"];
+  qAcount -> qAcount [label="b, X→XX"];
+  qAcount -> qAcount [label="a, Z→Z\n(не последняя a)"];
+  qAcount -> qASA2   [label="a, Z→Z\n(последняя a в A1, контекст ASA)"];
+  qAcount -> qSAAS3  [label="a, Z→Z\n(последняя a в A1, контекст SAAS)"];
+
+
+  qAmatch -> qAmatch [label="b, X→ε"];
+  qAmatch -> qAmatch [label="a, Z→Z\n(не последняя a)"];
+  qAmatch -> qASA4   [label="a, M→M\n(последняя a, контекст ASA)"];
+  qAmatch -> qSAAS4  [label="a, M→M\n(последняя a, контекст SAAS)"];
+}

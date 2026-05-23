@@ -1,0 +1,200 @@
+digraph DFA {
+    rankdir=LR;
+    node [shape=circle];
+
+    // Стартовое состояние
+    start [shape=point];
+    start -> 1;
+
+    // Принимающие состояния
+    node [shape=doublecircle];
+    2 3 4 5 6 7 8 9 16 17 18 19 20 21 22 24 31;
+
+    node [shape=circle];
+
+    // 1: {A,D,F}
+    1 -> 26 [label="a"];
+    1 -> 27 [label="b"];
+
+    // 2: {AA,AB,AF,I,J}  (accept)
+    2 -> 32 [label="a"];
+    2 -> 33 [label="b"];
+    2 -> 34 [label="c"];
+
+    // 3: {AC}  (accept)
+    3 -> 6  [label="a"];
+    3 -> 7  [label="b"];
+    3 -> 34 [label="c"];
+
+    // 4: {AD}  (accept)
+    4 -> 8  [label="a"];
+    4 -> 9  [label="b"];
+    4 -> 38 [label="c"];
+
+    // 5: {AE,K}  (accept)
+    5 -> 32 [label="a"];
+    5 -> 35 [label="b"];
+    5 -> 34 [label="c"];
+
+    // 6: {AG}  (accept)
+    6 -> 32 [label="a"];
+    6 -> 33 [label="b"];
+    6 -> 10 [label="c"];
+
+    // 7: {AH}  (accept)
+    7 -> 36 [label="a"];
+    7 -> 11 [label="b"];
+    7 -> 12 [label="c"];
+
+    // 8: {AI}  (accept)
+    8 -> 32 [label="a"];
+    8 -> 35 [label="b"];
+    8 -> 10 [label="c"];
+
+    // 9: {AJ}  (accept)
+    9 -> 13 [label="a"];
+    9 -> 14 [label="b"];
+    9 -> 15 [label="c"];
+
+    // 10: {AK}
+    10 -> 41 [label="a,b"];
+
+    // 11: {AL}
+    11 -> 28 [label="b"];
+    11 -> 43 [label="c"];
+
+    // 12: {AM}
+    12 -> 16 [label="a,b"];
+
+    // 13: {AN}
+    13 -> 2  [label="a"];
+    13 -> 17 [label="b"];
+    13 -> 39 [label="c"];
+
+    // 14: {AO}
+    14 -> 3  [label="a"];
+    14 -> 18 [label="b"];
+    14 -> 43 [label="c"];
+
+    // 15: {AP}
+    15 -> 19 [label="a"];
+    15 -> 27 [label="b"];
+
+    // 16: {AQ}  (accept)
+    16 -> 32 [label="a"];
+    16 -> 33 [label="b"];
+    16 -> 20 [label="c"];
+
+    // 17: {AR}  (accept)
+    17 -> 36 [label="a"];
+    17 -> 11 [label="b"];
+    17 -> 34 [label="c"];
+
+    // 18: {AS}  (accept)
+    18 -> 21 [label="a"];
+    18 -> 22 [label="b"];
+    18 -> 38 [label="c"];
+
+    // 19: {AT}  (accept)
+    19 -> 32 [label="a"];
+    19 -> 35 [label="b"];
+    19 -> 20 [label="c"];
+
+    // 20: {AU}  (accept)
+    20 -> 23 [label="a"];
+    20 -> 33 [label="b"];
+    20 -> 34 [label="c"];
+
+    // 21: {AV}  (accept)
+    21 -> 6  [label="a"];
+    21 -> 7  [label="b"];
+    21 -> 10 [label="c"];
+
+    // 22: {AW}  (accept)
+    22 -> 21 [label="a"];
+    22 -> 22 [label="b"];
+    22 -> 15 [label="c"];
+
+    // 23: {AX}
+    23 -> 24 [label="c"];
+
+    // 24: {AY}  (accept)
+    24 -> 32 [label="a"];
+    24 -> 33 [label="b"];
+    24 -> 25 [label="c"];
+
+    // 25: {AZ}
+    25 -> 41 [label="a"];
+    25 -> 2  [label="c"];
+
+    // 26: {B}
+    26 -> 1  [label="b"];
+
+    // 27: {C}
+    27 -> 28 [label="b"];
+    27 -> 1  [label="c"];
+
+    // 28: {E}
+    28 -> 29 [label="a"];
+    28 -> 30 [label="b"];
+
+    // 29: {G}
+    29 -> 2  [label="b"];
+
+    // 30: {H}
+    30 -> 5  [label="a"];
+    30 -> 31 [label="b"];
+
+    // 31: {L}  (accept)
+    31 -> 36 [label="a"];
+    31 -> 37 [label="b"];
+    31 -> 38 [label="c"];
+
+    // 32: {M}
+    32 -> 39 [label="c"];
+
+    // 33: {N}
+    33 -> 40 [label="c"];
+
+    // 34: {O}
+    34 -> 41 [label="a"];
+
+    // 35: {P}
+    35 -> 26 [label="a"];
+    35 -> 27 [label="b"];
+    35 -> 40 [label="c"];
+
+    // 36: {Q}
+    36 -> 1  [label="b"];
+    36 -> 39 [label="c"];
+
+    // 37: {R}
+    37 -> 29 [label="a"];
+    37 -> 42 [label="b"];
+    37 -> 43 [label="c"];
+
+    // 38: {S}
+    38 -> 44 [label="a"];
+    38 -> 27 [label="b"];
+
+    // 39: {T}
+    39 -> 41 [label="c"];
+
+    // 40: {U}
+    40 -> 2  [label="a"];
+
+    // 41: {V,Z}
+    41 -> 2  [label="c"];
+
+    // 42: {W}
+    42 -> 3  [label="a"];
+    42 -> 4  [label="b"];
+
+    // 43: {X}
+    43 -> 5  [label="a"];
+    43 -> 27 [label="b"];
+
+    // 44: {Y}
+    44 -> 1  [label="b"];
+    44 -> 2  [label="c"];
+}
