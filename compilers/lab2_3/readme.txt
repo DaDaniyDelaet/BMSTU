@@ -1,0 +1,603 @@
+% Лабораторная работа № 2.3 «Синтаксический анализатор на основе
+предсказывающего анализа»
+% <лабораторная ещё не сдана>
+% Данил Кравец, ИУ9-61Б
+
+# Цель работы
+
+Изучение алгоритма построения таблиц предсказывающего анализатора.
+
+# Индивидуальный вариант
+
+```text
+$ ключевые слова
+$ начинаются с обратной кавычки
+
+F  `is "n" `or "(" E ")" `end
+T  `is F T1 `end
+T1 `is "*" F T1 `or `epsilon `end
+`axiom E  `is T E1 `end
+E1 `is "+" T E1 `or `epsilon `end
+```
+
+# Реализация
+
+## Неформальное описание синтаксиса входного языка
+
+Входной язык предназначен для записи правил контекстно-свободной
+грамматики.
+
+Файл состоит из последовательности правил. Каждое правило содержит имя
+нетерминала, ключевое слово `is`, одну или несколько альтернатив и
+завершается ключевым словом `end`.
+
+Перед именем правила может находиться ключевое слово `axiom`,
+обозначающее аксиому грамматики.
+
+Альтернативы разделяются ключевым словом `or`. Правая часть правила может
+содержать нетерминалы, терминалы в кавычках и ключевое слово `epsilon`,
+обозначающее пустую цепочку.
+
+## Лексическая структура
+
+Токены входного языка:
+
+* IDENT — идентификатор нетерминала;
+* STRING — терминал в двойных кавычках;
+* AXIOM — ключевое слово `axiom`;
+* IS — ключевое слово `is`;
+* OR — ключевое слово `or`;
+* END — ключевое слово `end`;
+* EPSILON — ключевое слово `epsilon`;
+* EOF — конец файла.
+
+## Грамматика языка
+
+```text
+S           → Rules EOF
+
+Rules       → Rule Rules | ε
+
+Rule        → AxiomOpt IDENT IS Alts END
+
+AxiomOpt    → AXIOM | ε
+
+Alts        → Symbols AltsTail
+
+AltsTail    → OR Symbols AltsTail | ε
+
+Symbols     → Symbol SymbolsTail | EPSILON
+
+SymbolsTail → Symbol SymbolsTail | ε
+
+Symbol      → IDENT | STRING
+```
+
+## Программная реализация
+
+```python
+from dataclasses import dataclass
+
+@dataclass
+class Token:
+    kind: str
+    value: str
+    line: int
+    col: int
+
+
+class Lexer:
+    def __init__(self, text):
+        self.text = text
+        self.pos = 0
+        self.line = 1
+        self.col = 1
+
+    def current(self):
+        if self.pos >= len(self.text):
+            return None
+        return self.text[self.pos]
+
+    def advance(self):
+        ch = self.current()
+        self.pos += 1
+        if ch == "\n":
+            self.line += 1
+            self.col = 1
+        else:
+            self.col += 1
+        return ch
+
+    def tokenize(self):
+        tokens = []
+
+        while self.current() is not None:
+            ch = self.current()
+
+            if ch.isspace():
+                self.advance()
+                continue
+
+            line, col = self.line, self.col
+
+            if ch == "`":
+                self.advance()
+                word = ""
+                while self.current() is not None and self.current().isalpha():
+                    word += self.advance()
+
+                keywords = {
+                    "is": "IS",
+                    "or": "OR",
+                    "end": "END",
+                    "axiom": "AXIOM",
+                    "epsilon": "EPSILON"
+                }
+
+                if word not in keywords:
+                    raise SyntaxError(f"Unknown keyword at {line}:{col}")
+
+                tokens.append(Token(keywords[word], "`" + word, line, col))
+                continue
+
+            if ch == '"':
+                self.advance()
+                value = ""
+                while self.current() is not None and self.current() != '"':
+                    value += self.advance()
+
+                if self.current() != '"':
+                    raise SyntaxError(f"Unclosed string at {line}:{col}")
+
+                self.advance()
+                tokens.append(Token("STRING", '"' + value + '"', line, col))
+                continue
+
+            if ch.isalpha():
+                value = ""
+                while self.current() is not None and self.current().isalnum():
+                    value += self.advance()
+                tokens.append(Token("IDENT", value, line, col))
+                continue
+
+            raise SyntaxError(f"Unexpected symbol at {line}:{col}")
+
+        tokens.append(Token("EOF", "", self.line, self.col))
+        return tokens
+
+
+class Node:
+    counter = 0
+
+    def __init__(self, label):
+        self.id = Node.counter
+        Node.counter += 1
+        self.children = []
+        self.token = None
+
+    @property
+    def label(self):
+        return self.token.value if self.token.value else "EOF"
+
+
+class Parser:
+    def __init__(self, tokens):
+        self.tokens = tokens
+        self.pos = 0
+
+        self.table = {
+            ("S", "AXIOM"): ["Rules", "EOF"],
+            ("S", "IDENT"): ["Rules", "EOF"],
+            ("S", "EOF"): ["Rules", "EOF"],
+
+            ("Rules", "AXIOM"): ["Rule", "Rules"],
+            ("Rules", "IDENT"): ["Rule", "Rules"],
+            ("Rules", "EOF"): [],
+
+            ("Rule", "AXIOM"): ["AxiomOpt", "IDENT", "IS", "Alts", "END"],
+            ("Rule", "IDENT"): ["AxiomOpt", "IDENT", "IS", "Alts", "END"],
+
+            ("AxiomOpt", "AXIOM"): ["AXIOM"],
+            ("AxiomOpt", "IDENT"): [],
+
+            ("Alts", "IDENT"): ["Symbols", "AltsTail"],
+            ("Alts", "STRING"): ["Symbols", "AltsTail"],
+            ("Alts", "EPSILON"): ["Symbols", "AltsTail"],
+
+            ("AltsTail", "OR"): ["OR", "Symbols", "AltsTail"],
+            ("AltsTail", "END"): [],
+
+            ("Symbols", "IDENT"): ["Symbol", "SymbolsTail"],
+            ("Symbols", "STRING"): ["Symbol", "SymbolsTail"],
+            ("Symbols", "EPSILON"): ["EPSILON"],
+
+            ("SymbolsTail", "IDENT"): ["Symbol", "SymbolsTail"],
+            ("SymbolsTail", "STRING"): ["Symbol", "SymbolsTail"],
+            ("SymbolsTail", "OR"): [],
+            ("SymbolsTail", "END"): [],
+
+            ("Symbol", "IDENT"): ["IDENT"],
+            ("Symbol", "STRING"): ["STRING"],
+        }
+
+        self.nonterms = {
+            "S", "Rules", "Rule", "AxiomOpt", "Alts",
+            "AltsTail", "Symbols", "SymbolsTail", "Symbol"
+        }
+
+    def current(self):
+        return self.tokens[self.pos]
+
+    def parse(self):
+        Node.counter = 0
+        root = Node("S")
+        stack = [("S", root)]
+
+        while stack:
+            symbol, node = stack.pop()
+            token = self.current()
+
+            if symbol in self.nonterms:
+                key = (symbol, token.kind)
+
+                if key not in self.table:
+                    raise SyntaxError(
+                        f"Syntax error at {token.line}:{token.col}, got {token.value}"
+                    )
+
+                production = self.table[key]
+
+                if not production:
+                    node.children.append(Node("ε"))
+                else:
+                    children = [Node(s) for s in production]
+                    node.children.extend(children)
+
+                    for item in reversed(list(zip(production, children))):
+                        stack.append(item)
+
+            else:
+                if symbol != token.kind:
+                    raise SyntaxError(
+                        f"Syntax error at {token.line}:{token.col}, got {token.value}"
+                    )
+
+                node.token = token
+                self.pos += 1
+
+        return root
+
+
+def make_dot(root):
+    lines = ["digraph {"]
+
+    def walk(node):
+        safe = node.label.replace("\\", "\\\\").replace('"', '\\"')
+        lines.append(f'  n{node.id} [label="{safe}"]')
+
+
+        for child in node.children:
+            lines.append(f"  n{node.id} -> n{child.id}")
+            walk(child)
+
+        if len(node.children) > 1:
+            chain = " -> ".join(f"n{child.id}" for child in node.children)
+            lines.append(f"  {{ rank=same; {chain} [style=invis] }}")
+
+    walk(root)
+    lines.append("}")
+    return "\n".join(lines)
+
+
+def main():
+    text = open("input.txt", encoding="utf-8").read()
+
+    tokens = Lexer(text).tokenize()
+    tree = Parser(tokens).parse()
+
+    print(make_dot(tree))
+
+
+if __name__ == "__main__":
+    main()
+```
+
+# Тестирование
+
+Входные данные
+
+```text
+F  `is "n" `or "(" E ")" `end
+T  `is F T1 `end
+T1 `is "*" F T1 `or `epsilon `end
+`axiom E  `is T E1 `end
+E1 `is "+" T E1 `or `epsilon `end
+```
+
+Вывод на `stdout`
+
+```text
+digraph {
+  n0 [label="S"]
+  n0 -> n1
+  n1 [label="Rules"]
+  n1 -> n3
+  n3 [label="Rule"]
+  n3 -> n5
+  n5 [label="AxiomOpt"]
+  n5 -> n10
+  n10 [label="ε"]
+  n3 -> n6
+  n6 [label="F"]
+  n3 -> n7
+  n7 [label="`is"]
+  n3 -> n8
+  n8 [label="Alts"]
+  n8 -> n11
+  n11 [label="Symbols"]
+  n11 -> n13
+  n13 [label="Symbol"]
+  n13 -> n15
+  n15 [label="\"n\""]
+  n11 -> n14
+  n14 [label="SymbolsTail"]
+  n14 -> n16
+  n16 [label="ε"]
+  { rank=same; n13 -> n14 [style=invis] }
+  n8 -> n12
+  n12 [label="AltsTail"]
+  n12 -> n17
+  n17 [label="`or"]
+  n12 -> n18
+  n18 [label="Symbols"]
+  n18 -> n20
+  n20 [label="Symbol"]
+  n20 -> n22
+  n22 [label="\"(\""]
+  n18 -> n21
+  n21 [label="SymbolsTail"]
+  n21 -> n23
+  n23 [label="Symbol"]
+  n23 -> n25
+  n25 [label="E"]
+  n21 -> n24
+  n24 [label="SymbolsTail"]
+  n24 -> n26
+  n26 [label="Symbol"]
+  n26 -> n28
+  n28 [label="\")\""]
+  n24 -> n27
+  n27 [label="SymbolsTail"]
+  n27 -> n29
+  n29 [label="ε"]
+  { rank=same; n26 -> n27 [style=invis] }
+  { rank=same; n23 -> n24 [style=invis] }
+  { rank=same; n20 -> n21 [style=invis] }
+  n12 -> n19
+  n19 [label="AltsTail"]
+  n19 -> n30
+  n30 [label="ε"]
+  { rank=same; n17 -> n18 -> n19 [style=invis] }
+  { rank=same; n11 -> n12 [style=invis] }
+  n3 -> n9
+  n9 [label="`end"]
+  { rank=same; n5 -> n6 -> n7 -> n8 -> n9 [style=invis] }
+  n1 -> n4
+  n4 [label="Rules"]
+  n4 -> n31
+  n31 [label="Rule"]
+  n31 -> n33
+  n33 [label="AxiomOpt"]
+  n33 -> n38
+  n38 [label="ε"]
+  n31 -> n34
+  n34 [label="T"]
+  n31 -> n35
+  n35 [label="`is"]
+  n31 -> n36
+  n36 [label="Alts"]
+  n36 -> n39
+  n39 [label="Symbols"]
+  n39 -> n41
+  n41 [label="Symbol"]
+  n41 -> n43
+  n43 [label="F"]
+  n39 -> n42
+  n42 [label="SymbolsTail"]
+  n42 -> n44
+  n44 [label="Symbol"]
+  n44 -> n46
+  n46 [label="T1"]
+  n42 -> n45
+  n45 [label="SymbolsTail"]
+  n45 -> n47
+  n47 [label="ε"]
+  { rank=same; n44 -> n45 [style=invis] }
+  { rank=same; n41 -> n42 [style=invis] }
+  n36 -> n40
+  n40 [label="AltsTail"]
+  n40 -> n48
+  n48 [label="ε"]
+  { rank=same; n39 -> n40 [style=invis] }
+  n31 -> n37
+  n37 [label="`end"]
+  { rank=same; n33 -> n34 -> n35 -> n36 -> n37 [style=invis] }
+  n4 -> n32
+  n32 [label="Rules"]
+  n32 -> n49
+  n49 [label="Rule"]
+  n49 -> n51
+  n51 [label="AxiomOpt"]
+  n51 -> n56
+  n56 [label="ε"]
+  n49 -> n52
+  n52 [label="T1"]
+  n49 -> n53
+  n53 [label="`is"]
+  n49 -> n54
+  n54 [label="Alts"]
+  n54 -> n57
+  n57 [label="Symbols"]
+  n57 -> n59
+  n59 [label="Symbol"]
+  n59 -> n61
+  n61 [label="\"*\""]
+  n57 -> n60
+  n60 [label="SymbolsTail"]
+  n60 -> n62
+  n62 [label="Symbol"]
+  n62 -> n64
+  n64 [label="F"]
+  n60 -> n63
+  n63 [label="SymbolsTail"]
+  n63 -> n65
+  n65 [label="Symbol"]
+  n65 -> n67
+  n67 [label="T1"]
+  n63 -> n66
+  n66 [label="SymbolsTail"]
+  n66 -> n68
+  n68 [label="ε"]
+  { rank=same; n65 -> n66 [style=invis] }
+  { rank=same; n62 -> n63 [style=invis] }
+  { rank=same; n59 -> n60 [style=invis] }
+  n54 -> n58
+  n58 [label="AltsTail"]
+  n58 -> n69
+  n69 [label="`or"]
+  n58 -> n70
+  n70 [label="Symbols"]
+  n70 -> n72
+  n72 [label="`epsilon"]
+  n58 -> n71
+  n71 [label="AltsTail"]
+  n71 -> n73
+  n73 [label="ε"]
+  { rank=same; n69 -> n70 -> n71 [style=invis] }
+  { rank=same; n57 -> n58 [style=invis] }
+  n49 -> n55
+  n55 [label="`end"]
+  { rank=same; n51 -> n52 -> n53 -> n54 -> n55 [style=invis] }
+  n32 -> n50
+  n50 [label="Rules"]
+  n50 -> n74
+  n74 [label="Rule"]
+  n74 -> n76
+  n76 [label="AxiomOpt"]
+  n76 -> n81
+  n81 [label="`axiom"]
+  n74 -> n77
+  n77 [label="E"]
+  n74 -> n78
+  n78 [label="`is"]
+  n74 -> n79
+  n79 [label="Alts"]
+  n79 -> n82
+  n82 [label="Symbols"]
+  n82 -> n84
+  n84 [label="Symbol"]
+  n84 -> n86
+  n86 [label="T"]
+  n82 -> n85
+  n85 [label="SymbolsTail"]
+  n85 -> n87
+  n87 [label="Symbol"]
+  n87 -> n89
+  n89 [label="E1"]
+  n85 -> n88
+  n88 [label="SymbolsTail"]
+  n88 -> n90
+  n90 [label="ε"]
+  { rank=same; n87 -> n88 [style=invis] }
+  { rank=same; n84 -> n85 [style=invis] }
+  n79 -> n83
+  n83 [label="AltsTail"]
+  n83 -> n91
+  n91 [label="ε"]
+  { rank=same; n82 -> n83 [style=invis] }
+  n74 -> n80
+  n80 [label="`end"]
+  { rank=same; n76 -> n77 -> n78 -> n79 -> n80 [style=invis] }
+  n50 -> n75
+  n75 [label="Rules"]
+  n75 -> n92
+  n92 [label="Rule"]
+  n92 -> n94
+  n94 [label="AxiomOpt"]
+  n94 -> n99
+  n99 [label="ε"]
+  n92 -> n95
+  n95 [label="E1"]
+  n92 -> n96
+  n96 [label="`is"]
+  n92 -> n97
+  n97 [label="Alts"]
+  n97 -> n100
+  n100 [label="Symbols"]
+  n100 -> n102
+  n102 [label="Symbol"]
+  n102 -> n104
+  n104 [label="\"+\""]
+  n100 -> n103
+  n103 [label="SymbolsTail"]
+  n103 -> n105
+  n105 [label="Symbol"]
+  n105 -> n107
+  n107 [label="T"]
+  n103 -> n106
+  n106 [label="SymbolsTail"]
+  n106 -> n108
+  n108 [label="Symbol"]
+  n108 -> n110
+  n110 [label="E1"]
+  n106 -> n109
+  n109 [label="SymbolsTail"]
+  n109 -> n111
+  n111 [label="ε"]
+  { rank=same; n108 -> n109 [style=invis] }
+  { rank=same; n105 -> n106 [style=invis] }
+  { rank=same; n102 -> n103 [style=invis] }
+  n97 -> n101
+  n101 [label="AltsTail"]
+  n101 -> n112
+  n112 [label="`or"]
+  n101 -> n113
+  n113 [label="Symbols"]
+  n113 -> n115
+  n115 [label="`epsilon"]
+  n101 -> n114
+  n114 [label="AltsTail"]
+  n114 -> n116
+  n116 [label="ε"]
+  { rank=same; n112 -> n113 -> n114 [style=invis] }
+  { rank=same; n100 -> n101 [style=invis] }
+  n92 -> n98
+  n98 [label="`end"]
+  { rank=same; n94 -> n95 -> n96 -> n97 -> n98 [style=invis] }
+  n75 -> n93
+  n93 [label="Rules"]
+  n93 -> n117
+  n117 [label="ε"]
+  { rank=same; n92 -> n93 [style=invis] }
+  { rank=same; n74 -> n75 [style=invis] }
+  { rank=same; n49 -> n50 [style=invis] }
+  { rank=same; n31 -> n32 [style=invis] }
+  { rank=same; n3 -> n4 [style=invis] }
+  n0 -> n2
+  n2 [label="EOF"]
+  { rank=same; n1 -> n2 [style=invis] }
+}
+
+```
+
+В результате работы программы был сформирован файл tree.dot, по которому
+с помощью Graphviz построено дерево вывода входной грамматики.
+
+# Вывод
+
+В ходе выполнения лабораторной работы был реализован синтаксический
+анализатор на основе предсказывающего анализа. Была составлена таблица
+предсказывающего разбора, разработан лексический анализатор и реализован
+алгоритм LL(1)-разбора с построением дерева вывода. Также были получены
+практические навыки работы с представлением дерева разбора в формате
+Graphviz.

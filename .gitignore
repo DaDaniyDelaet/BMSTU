@@ -1,0 +1,14 @@
+.DS_Store
+**/.DS_Store
+
+__pycache__/
+*.pyc
+
+*.o
+*.so
+*.out
+*.class
+*.jar
+
+compilers/lab2_1/astprint
+gok/lab2/lab2
